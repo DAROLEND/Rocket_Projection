@@ -1,0 +1,21 @@
+[project]
+name = "rocket-projection"
+version = "0.1.0"
+description = "Rocket trajectory simulation API with RAG"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "aiosqlite>=0.22.1",
+    "alembic>=1.19.1",
+    "anthropic>=1.2.0",
+    "chromadb>=1.5.9",
+    "fastapi[standard]>=0.141.1",
+    "greenlet>=3.5.5",
+    "instructor>=1.16.0",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+    "python-dotenv>=1.2.3",
+    "sentence-transformers>=6.0.0",
+    "sqlalchemy>=2.0.52",
+    "uvicorn>=0.52.4",
+]

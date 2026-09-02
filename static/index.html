@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Rocket Trajectory Viewer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>🚀 Rocket Trajectory Viewer</h1>
+
+    <div class="controls">
+        <select id="simSelect" onchange="loadSimulation()">
+            <option value="">Завантаження списку...</option>
+        </select>
+        <button id="restartBtn" onclick="restart()" disabled>↺ Спочатку</button>
+        <button id="playBtn" onclick="togglePlay()" disabled>▶ Play</button>
+        <label class="speed-label">
+            Швидкість: <span id="speedValue">x1.0</span>
+            <input type="range" id="speed" min="0.1" max="5" step="0.1" value="1" oninput="updateSpeedLabel()">
+        </label>
+        <label class="scale-toggle">
+            <input type="checkbox" id="fixedScale" onchange="loadSimulation()">
+            Фіксований масштаб
+        </label>
+    </div>
+
+    <p id="info"></p>
+
+    <div class="viewer-layout">
+        <canvas id="canvas" width="700" height="420"></canvas>
+
+        <div class="side-panel">
+        <div class="telemetry">
+            <h3>Телеметрія</h3>
+            <div class="telemetry-row">
+            <span>Час</span>
+            <input type="number" id="telTimeInput" step="0.01" min="0" value="0" class="telemetry-input">
+        </div>
+        <div class="telemetry-row"><span>Висота (y)</span><strong id="telY">0.00 м</strong></div>
+        <div class="telemetry-row"><span>Дальність (x)</span><strong id="telX">0.00 м</strong></div>
+        <div class="telemetry-row"><span>Швидкість</span><strong id="telSpeed">0.00 м/с</strong></div>
+        <div class="telemetry-row"><span>Vx</span><strong id="telVx">0.00 м/с</strong></div>
+        <div class="telemetry-row"><span>Vy</span><strong id="telVy">0.00 м/с</strong></div>
+    </div>
+
+        <div class="chat">
+            <h3>Запитай про симуляції</h3>
+            <div id="chatMessages" class="chat-messages">
+                <div class="chat-placeholder">Запитай, наприклад: "яка симуляція мала найбільший апогей?"</div>
+        </div>
+        <div class="chat-input-row">
+            <input type="text" id="chatInput" placeholder="Твоє питання..." onkeydown="handleChatKeydown(event)">
+            <button id="chatSendBtn" onclick="sendChatMessage()">➤</button>
+        </div>
+    </div>
+    </div>
+</div>
+
+    <script src="script.js"></script>
+</body>
+</html>
