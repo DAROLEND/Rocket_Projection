@@ -32,3 +32,10 @@ class AskResponse(BaseModel):
     answer: str = Field(description="Пряма відповідь на питання користувача")
     confidence: str = Field(description="high, medium, або low — впевненість у відповіді")
     relevant_simulation_ids: list[int] = Field(description="ID симуляцій, використаних для відповіді")
+
+class AgentChatRequest(BaseModel):
+    message: str = Field(min_length=1, description="Повідомлення до AI-агента")
+
+class AgentChatResponse(BaseModel):
+    reply: str
+    simulation_id: int | None = None

@@ -12,7 +12,7 @@ let currentLoadedId = null;
 let globalMaxX = null;
 let globalMaxY = null;
 
-async function populateSimSelect() {
+async function populateSimSelect(preferredId = null) {
   const res = await fetch('/simulations');
   if (!res.ok) return;
   const list = await res.json();
@@ -21,9 +21,13 @@ async function populateSimSelect() {
   select.innerHTML = '';
 
   if (list.length === 0) {
-    select.innerHTML = '<option value="">Немає симуляцій</option>';
-    return;
-  }
+  select.innerHTML = '<option value="">Немає симуляцій</option>';
+  document.getElementById('restartBtn').disabled = true;
+  document.getElementById('playBtn').disabled = true;
+  document.getElementById('deleteBtn').disabled = true;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  return;
+}
 
   list.forEach(sim => {
     const option = document.createElement('option');
@@ -32,7 +36,11 @@ async function populateSimSelect() {
     select.appendChild(option);
   });
 
-  loadSimulation();
+  if (preferredId !== null && list.some(s => s.id === preferredId)) {
+    select.value = preferredId;
+  }
+
+  await loadSimulation();
 }
 
 async function loadSimulation() {
@@ -66,8 +74,31 @@ async function loadSimulation() {
 
   document.getElementById('restartBtn').disabled = false;
   document.getElementById('playBtn').disabled = false;
+  document.getElementById('deleteBtn').disabled = false;
 
   setTimeout(() => canvas.classList.remove('fading'), 50);
+}
+
+async function deleteSimulation() {
+  const id = document.getElementById('simSelect').value;
+  if (!id) return;
+
+  const confirmed = confirm(`Видалити симуляцію #${id}? Цю дію не можна скасувати.`);
+  if (!confirmed) return;
+
+  const res = await fetch(`/simulations/${id}`, { method: 'DELETE' });
+
+  if (!res.ok) {
+    document.getElementById('info').textContent = 'Не вдалося видалити симуляцію';
+    return;
+  }
+
+  document.getElementById('restartBtn').disabled = true;
+  document.getElementById('playBtn').disabled = true;
+  document.getElementById('deleteBtn').disabled = true;
+  trajectory = [];
+
+  await populateSimSelect();
 }
 
 async function fetchGlobalMax() {
@@ -88,7 +119,11 @@ function resetToStart() {
   playing = false;
   lastFrameTs = null;
   document.getElementById('playBtn').textContent = '▶ Play';
-  drawFrame();
+  if (compareMode) {
+    drawCompareFrame();
+  } else {
+    drawFrame();
+  }
 }
 
 function restart() {
@@ -280,13 +315,18 @@ function animate(ts) {
   const speed = parseFloat(document.getElementById('speed').value);
   simTime += dt * speed;
 
-  if (simTime >= maxT) {
-    simTime = maxT;
+  const limit = compareMode ? compareMaxT : maxT;
+  if (simTime >= limit) {
+    simTime = limit;
     playing = false;
     document.getElementById('playBtn').textContent = '▶ Play';
   }
 
-  drawFrame();
+  if (compareMode) {
+    drawCompareFrame();
+  } else {
+    drawFrame();
+  }
   if (playing) requestAnimationFrame(animate);
 }
 
@@ -355,13 +395,25 @@ document.getElementById('telTimeInput').addEventListener('change', (e) => {
   drawFrame();
 });
 
+let chatMode = 'ask';
+
+function setChatMode(mode) {
+  chatMode = mode;
+  document.getElementById('modeAskBtn').classList.toggle('active', mode === 'ask');
+  document.getElementById('modeAgentBtn').classList.toggle('active', mode === 'agent');
+
+  const input = document.getElementById('chatInput');
+  input.placeholder = mode === 'ask'
+    ? 'Запитай про існуючі симуляції...'
+    : 'Наприклад: запусти симуляцію масою 2кг, кут 45, швидкість 50 м/с';
+}
+
 async function sendChatMessage() {
   const input = document.getElementById('chatInput');
   const question = input.value.trim();
   if (!question) return;
 
   const messagesEl = document.getElementById('chatMessages');
-
   const placeholder = messagesEl.querySelector('.chat-placeholder');
   if (placeholder) placeholder.remove();
 
@@ -370,18 +422,21 @@ async function sendChatMessage() {
 
   const loadingEl = document.createElement('div');
   loadingEl.className = 'chat-message loading';
-  loadingEl.textContent = 'Думаю...';
+  loadingEl.textContent = chatMode === 'agent' ? 'Агент працює...' : 'Думаю...';
   messagesEl.appendChild(loadingEl);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
   document.getElementById('chatSendBtn').disabled = true;
 
   try {
-    const res = await fetch('/ask', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question }),
-    });
+  const endpoint = chatMode === 'agent' ? '/agent/chat' : '/ask';
+  const body = chatMode === 'agent' ? { message: question } : { question };
+
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 
     loadingEl.remove();
 
@@ -391,8 +446,15 @@ async function sendChatMessage() {
     }
 
     const data = await res.json();
-    appendChatMessage(data.answer, 'assistant', data.confidence, data.relevant_simulation_ids);
-  } catch (err) {
+
+  if (chatMode === 'agent') {
+    appendChatMessage(data.reply, 'assistant');
+    await populateSimSelect(data.simulation_id);
+    if (data.simulation_id && !playing) {
+      togglePlay();
+    }
+  }
+    } catch (err) {
     loadingEl.remove();
     appendChatMessage('Не вдалося зв\'язатись із сервером.', 'assistant');
   } finally {
@@ -438,6 +500,202 @@ function handleChatKeydown(event) {
   if (event.key === 'Enter') {
     sendChatMessage();
   }
+}
+
+const COMPARE_COLORS = ['#3b82f6', '#f472b6', '#facc15', '#34d399', '#f97316', '#a78bfa'];
+
+let compareMode = false;
+let compareSims = []; // [{id, trajectory, maxT, apogee, flight_time, landing_x, color}]
+let compareMaxT = 0;
+
+async function toggleCompareMode() {
+  const panel = document.getElementById('comparePanel');
+  const isHidden = panel.classList.contains('hidden');
+
+  if (isHidden) {
+    const res = await fetch('/simulations');
+    const list = await res.json();
+    const checkboxesEl = document.getElementById('compareCheckboxes');
+    checkboxesEl.innerHTML = '';
+
+    list.forEach(sim => {
+      const label = document.createElement('label');
+      label.className = 'compare-checkbox-item';
+      label.innerHTML = `
+        <input type="checkbox" value="${sim.id}" onchange="updateCompareCount()">
+        #${sim.id} — апогей ${sim.apogee.toFixed(1)}м, дальність ${sim.landing_x.toFixed(1)}м
+      `;
+      checkboxesEl.appendChild(label);
+    });
+
+    updateCompareCount();
+    panel.classList.remove('hidden');
+  } else {
+    panel.classList.add('hidden');
+  }
+}
+
+function updateCompareCount() {
+  const checkboxes = document.querySelectorAll('#compareCheckboxes input');
+  const checked = document.querySelectorAll('#compareCheckboxes input:checked');
+  document.getElementById('compareCount').textContent = `${checked.length} обрано (макс. 6)`;
+
+  checkboxes.forEach(cb => {
+    if (!cb.checked && checked.length >= 6) {
+      cb.disabled = true;
+    } else {
+      cb.disabled = false;
+    }
+  });
+}
+
+function exitCompareMode() {
+  compareMode = false;
+  compareSims = [];
+  document.getElementById('comparePanel').classList.add('hidden');
+  document.getElementById('compareLegend').classList.add('hidden');
+
+  document.getElementById('simSelect').disabled = false;
+  document.getElementById('fixedScale').disabled = false;
+
+  playing = false;
+  document.getElementById('playBtn').textContent = '▶ Play';
+  loadSimulation();
+}
+
+async function applyCompare() {
+  const checked = Array.from(
+    document.querySelectorAll('#compareCheckboxes input:checked')
+  ).map(cb => parseInt(cb.value));
+
+  if (checked.length < 2) {
+    alert('Обери щонайменше 2 симуляції для порівняння.');
+    return;
+  }
+  if (checked.length > 6) {
+    alert('Максимум 6 симуляцій одночасно.');
+    return;
+  }
+
+  compareSims = [];
+  for (let i = 0; i < checked.length; i++) {
+    const res = await fetch(`/simulations/${checked[i]}`);
+    const data = await res.json();
+    compareSims.push({
+      id: data.id,
+      trajectory: data.trajectory,
+      maxT: data.trajectory[data.trajectory.length - 1][1],
+      apogee: data.apogee,
+      flight_time: data.flight_time,
+      landing_x: data.landing_x,
+      color: COMPARE_COLORS[i % COMPARE_COLORS.length],
+    });
+  }
+
+  compareMaxT = Math.max(...compareSims.map(s => s.maxT));
+  compareMode = true;
+  simTime = 0;
+  playing = false;
+  document.getElementById('playBtn').textContent = '▶ Play';
+
+  document.getElementById('simSelect').disabled = true;
+  document.getElementById('fixedScale').disabled = true;
+  document.getElementById('comparePanel').classList.add('hidden');
+  document.getElementById('restartBtn').disabled = false;
+  document.getElementById('playBtn').disabled = false;
+
+  renderCompareLegend();
+  computeCompareScale();
+  drawCompareFrame();
+}
+
+function computeCompareScale() {
+  const maxX = Math.max(...compareSims.map(s => Math.max(...s.trajectory.map(p => p[2]))));
+  const maxY = Math.max(...compareSims.map(s => Math.max(...s.trajectory.map(p => p[3])))) * 1.15;
+  scaleX = (canvas.width - 2 * PADDING) / (maxX || 1);
+  scaleY = (canvas.height - 2 * PADDING) / (maxY || 1);
+}
+
+function renderCompareLegend() {
+  const legendEl = document.getElementById('compareLegend');
+  legendEl.innerHTML = compareSims.map(s => `
+    <div class="compare-legend-row">
+      <div class="compare-legend-swatch" style="background:${s.color}"></div>
+      <span>#${s.id}: ${s.apogee.toFixed(1)}м, ${s.flight_time.toFixed(2)}с, ${s.landing_x.toFixed(1)}м</span>
+    </div>
+  `).join('');
+  legendEl.classList.remove('hidden');
+}
+
+function drawCompareFrame() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const ground = toScreen(0, 0);
+  ctx.strokeStyle = '#475569';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, ground.sy);
+  ctx.lineTo(canvas.width, ground.sy);
+  ctx.stroke();
+
+  compareSims.forEach(sim => {
+    // Бліда повна траєкторія
+    ctx.strokeStyle = sim.color + '40';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    sim.trajectory.forEach((p, i) => {
+      const { sx, sy } = toScreen(p[2], p[3]);
+      if (i === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+    });
+    ctx.stroke();
+
+    // Пройдена частина (яскрава)
+    const localTime = Math.min(simTime, sim.maxT);
+    ctx.strokeStyle = sim.color;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    sim.trajectory.forEach((p, i) => {
+      if (p[1] > localTime) return;
+      const { sx, sy } = toScreen(p[2], p[3]);
+      if (i === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+    });
+    ctx.stroke();
+
+    // Ракета
+    const point = interpolateAtGeneric(sim.trajectory, sim.maxT, localTime);
+    const [, , x, y, vx, vy] = point;
+    const { sx, sy } = toScreen(x, Math.max(y, 0));
+    const angle = Math.atan2(-vy, vx);
+
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(-angle);
+    ctx.font = '20px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🚀', 0, 0);
+    ctx.restore();
+  });
+}
+
+function interpolateAtGeneric(trajectory, maxT, t) {
+  if (t <= trajectory[0][1]) return trajectory[0];
+  if (t >= maxT) return trajectory[trajectory.length - 1];
+
+  for (let i = 0; i < trajectory.length - 1; i++) {
+    const a = trajectory[i], b = trajectory[i + 1];
+    if (t >= a[1] && t <= b[1]) {
+      const k = (t - a[1]) / (b[1] - a[1] || 1);
+      return [
+        a[0], t,
+        a[2] + k * (b[2] - a[2]),
+        a[3] + k * (b[3] - a[3]),
+        a[4] + k * (b[4] - a[4]),
+        a[5] + k * (b[5] - a[5]),
+      ];
+    }
+  }
+  return trajectory[trajectory.length - 1];
 }
 
 populateSimSelect();

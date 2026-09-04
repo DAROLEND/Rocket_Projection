@@ -13,9 +13,15 @@ from app.schemas import (
     SimulationDetail,
     AskRequest,
     AskResponse,
+    AgentChatRequest,
+    AgentChatResponse,
 )
 from app.simulation_service import run_simulation
 from app.rag_service import index_simulation, answer_question
+
+from app.agent import run_agent
+
+from app.rag_service import index_simulation, answer_question, _collection
 
 
 @asynccontextmanager
@@ -87,3 +93,24 @@ async def get_simulation(simulation_id: int, db: AsyncSession = Depends(get_db))
 async def ask_question(payload: AskRequest):
     result = answer_question(payload.question)
     return result
+
+@app.post("/agent/chat", response_model=AgentChatResponse)
+async def agent_chat(payload: AgentChatRequest, db: AsyncSession = Depends(get_db)):
+    result = await run_agent(payload.message, db)
+    return AgentChatResponse(**result)
+
+@app.delete("/simulations/{simulation_id}", status_code=204)
+async def delete_simulation(simulation_id: int, db: AsyncSession = Depends(get_db)):
+    simulation = await db.get(Simulation, simulation_id)
+    if simulation is None:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+
+    await db.delete(simulation)
+    await db.commit()
+
+    try:
+        _collection.delete(ids=[str(simulation_id)])
+    except Exception:
+        pass  # якщо запису нема в ChromaDB — ігноруємо, не критично
+
+    return None
