@@ -1,0 +1,10 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./rocket.db:/app/rocket.db
+      - ./chroma_data:/app/chroma_data

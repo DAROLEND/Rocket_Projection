@@ -21,7 +21,9 @@ def index_simulation(simulation) -> None:
     description = build_description(simulation)
     embedding = _embedding_model.encode(description).tolist()
 
-    _collection.add(
+    # upsert (not add) — editing an existing simulation re-indexes the same id
+    # with a fresh description/embedding instead of erroring on a duplicate.
+    _collection.upsert(
         ids=[str(simulation.id)],
         embeddings=[embedding],
         documents=[description],

@@ -1,4 +1,4 @@
-from sqlalchemy import Float, Integer, JSON, DateTime, func
+from sqlalchemy import Float, Integer, JSON, DateTime, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 from app.database import Base
@@ -14,6 +14,17 @@ class Simulation(Base):
     cross_section_area: Mapped[float] = mapped_column(Float)
     v0: Mapped[float] = mapped_column(Float)
     angle_deg: Mapped[float] = mapped_column(Float)
+
+    # опційні параметри двигуна — якщо не задані, чиста балістична траєкторія (як раніше)
+    thrust: Mapped[float | None] = mapped_column(Float, nullable=True)
+    burn_time: Mapped[float | None] = mapped_column(Float, nullable=True)
+    propellant_mass: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # опційний парашут — спрацьовує в момент початку падіння (vy < 0)
+    parachute_cd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    parachute_area: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    integration_method: Mapped[str] = mapped_column(String, nullable=False, server_default="euler")
 
     # результати
     apogee: Mapped[float] = mapped_column(Float)
