@@ -99,7 +99,7 @@ async def create_simulation(payload: SimulationCreate, db: AsyncSession = Depend
     summary="Знайти кут запуску з максимальною дальністю",
     description=(
         "Без опору повітря оптимальний кут завжди 45°. З квадратичним опором дальність "
-        "як функція кута лишається одновершинною, але пік зсувається нижче 45° — шукаємо "
+        "як функція кута лишається одновершинною, але пік зсувається нижче 45° - шукаємо "
         "його чисельно golden-section search'ем, а не з формули."
     ),
 )
@@ -120,7 +120,7 @@ async def optimal_angle(payload: OptimalAngleRequest):
     summary="Monte Carlo розкид приземлення",
     description=(
         "Прогонить один і той самий запуск N разів з випадковим шумом на кут і швидкість, "
-        "і повертає розкид точок приземлення (не зберігається в БД — суто аналіз)."
+        "і повертає розкид точок приземлення (не зберігається в БД - суто аналіз)."
     ),
 )
 async def dispersion(payload: DispersionRequest):
@@ -188,9 +188,9 @@ async def update_simulation(simulation_id: int, payload: SimulationCreate, db: A
     tags=["rag"],
     summary="Питання по симуляціях (RAG, structured output)",
     description=(
-        "Чистий RAG-пайплайн: embedding питання → semantic search по ChromaDB → "
+        "Чистий RAG-пайплайн: embedding питання -> semantic search по ChromaDB -> "
         "grounded-відповідь від Claude у вигляді structured output (Instructor). "
-        "Без tool-use — одноразовий запит-відповідь."
+        "Без tool-use - одноразовий запит-відповідь."
     ),
 )
 async def ask_question(payload: AskRequest):
@@ -203,7 +203,7 @@ async def ask_question(payload: AskRequest):
     response_model=AgentChatResponse,
     tags=["agent"],
     summary="AI-агент з tool use (без стрімінгу)",
-    description="Той самий агент, що й /agent/chat/stream, але повертає готову відповідь одним блоком — зручно для curl/скриптів.",
+    description="Той самий агент, що й /agent/chat/stream, але повертає готову відповідь одним блоком - зручно для curl/скриптів.",
 )
 async def agent_chat(payload: AgentChatRequest, db: AsyncSession = Depends(get_db)):
     result = await run_agent(payload.message, db, payload.session_id)
@@ -217,7 +217,7 @@ async def agent_chat(payload: AgentChatRequest, db: AsyncSession = Depends(get_d
     description=(
         "Стрімить відповідь агента по токенах плюс окремі події на кожен виклик "
         "інструменту, щоб фронтенд міг показати живий трейс роботи агента. "
-        "Формат: newline-delimited JSON, по одному events на рядок — "
+        "Формат: newline-delimited JSON, по одному events на рядок - "
         "{type: text_delta|tool_call|done}."
     ),
 )
@@ -240,6 +240,6 @@ async def delete_simulation(simulation_id: int, db: AsyncSession = Depends(get_d
     try:
         _collection.delete(ids=[str(simulation_id)])
     except Exception:
-        pass  # якщо запису нема в ChromaDB — ігноруємо, не критично
+        pass  # якщо запису нема в ChromaDB - ігноруємо, не критично
 
     return None

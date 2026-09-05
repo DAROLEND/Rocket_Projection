@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>🚀 Rocket Trajectory Viewer</h1>
+    <h1>Rocket Trajectory Viewer</h1>
 
     <div class="page-content">
         <div class="controls">
@@ -17,8 +17,8 @@
             <button id="playBtn" onclick="togglePlay()" disabled>▶ Play</button>
             <button id="createToggleBtn" onclick="toggleCreateMode()">+ Нова симуляція</button>
             <button id="compareToggleBtn" onclick="toggleCompareMode()">Порівняти</button>
-            <button id="editBtn" onclick="openEditMode()" disabled title="Редагувати поточну симуляцію">✏️</button>
-            <button id="deleteBtn" onclick="deleteSimulation()" class="delete-btn" disabled>🗑</button>
+            <button id="editBtn" onclick="openEditMode()" disabled title="Редагувати поточну симуляцію">Редагувати</button>
+            <button id="deleteBtn" onclick="deleteSimulation()" class="delete-btn" disabled>Видалити</button>
             <label class="speed-label">
                 Швидкість: <span id="speedValue">x1.0</span>
                 <input type="range" id="speed" min="0.1" max="5" step="0.1" value="1" oninput="updateSpeedLabel()">
@@ -38,13 +38,13 @@
             <div class="create-fields">
                 <label>
                     <span class="field-label-text">Маса, кг
-                        <span class="field-tip">ⓘ<span class="field-tip-content">Маса ракети. Якщо додаєш двигун — це маса разом із паливом на старті (паливо потім вигорає).</span></span>
+                        <span class="field-tip">ⓘ<span class="field-tip-content">Маса ракети. Якщо додаєш двигун - це маса разом із паливом на старті (паливо потім вигорає).</span></span>
                     </span>
                     <input type="number" id="createMass" step="0.01" min="0.01" value="0.5">
                 </label>
                 <label>
                     <span class="field-label-text">Швидкість, м/с
-                        <span class="field-tip">ⓘ<span class="field-tip-content">Початкова швидкість у момент старту. Якщо додаєш двигун — тяга додасться до цієї швидкості під час горіння.</span></span>
+                        <span class="field-tip">ⓘ<span class="field-tip-content">Початкова швидкість у момент старту. Якщо додаєш двигун - тяга додасться до цієї швидкості під час горіння.</span></span>
                     </span>
                     <input type="number" id="createV0" step="0.1" min="0.1" value="40">
                 </label>
@@ -56,19 +56,19 @@
                 </label>
                 <label>
                     <span class="field-label-text">Коеф. опору
-                        <span class="field-tip">ⓘ<span class="field-tip-content">Коефіцієнт аеродинамічного опору (Cd). Типово 0.3–0.5 для невеликої ракети — більше значення = більше гальмування повітрям.</span></span>
+                        <span class="field-tip">ⓘ<span class="field-tip-content">Коефіцієнт аеродинамічного опору (Cd). Типово 0.3–0.5 для невеликої ракети - більше значення = більше гальмування повітрям.</span></span>
                     </span>
                     <input type="number" id="createDrag" step="0.01" min="0.01" value="0.47">
                 </label>
                 <label>
                     <span class="field-label-text">Площа перерізу, м²
-                        <span class="field-tip">ⓘ<span class="field-tip-content">Площа поперечного перерізу ракети. Разом з Cd визначає силу опору повітря: більша площа — більше гальмування.</span></span>
+                        <span class="field-tip">ⓘ<span class="field-tip-content">Площа поперечного перерізу ракети. Разом з Cd визначає силу опору повітря: більша площа - більше гальмування.</span></span>
                     </span>
                     <input type="number" id="createArea" step="0.001" min="0.001" value="0.03">
                 </label>
                 <label>
                     <span class="field-label-text">Метод інтегрування
-                        <span class="field-tip">ⓘ<span class="field-tip-content"><b>Euler</b> (напівнеявний) — простий і швидкий, але накопичує похибку з кожним кроком. <b>RK4</b> (Runge-Kutta 4-го порядку) — обчислює 4 проміжні оцінки сили на крок і набагато точніший, особливо при грубому кроці часу чи довгому польоті.</span></span>
+                        <span class="field-tip">ⓘ<span class="field-tip-content"><b>Euler</b> (напівнеявний) - простий і швидкий, але накопичує похибку з кожним кроком. <b>RK4</b> (Runge-Kutta 4-го порядку) - обчислює 4 проміжні оцінки сили на крок і набагато точніший, особливо при грубому кроці часу чи довгому польоті.</span></span>
                     </span>
                     <select id="createMethod">
                         <option value="euler">Euler</option>
@@ -79,16 +79,16 @@
 
             <div class="create-extra-toggles">
                 <label class="create-checkbox">
-                    <input type="checkbox" id="toggleEngine" onchange="toggleEngineFields()"> ⚙ Двигун (тяга + паливо)
-                    <span class="field-tip">ⓘ<span class="field-tip-content">Додає фазу активного розгону: двигун штовхає ракету постійною тягою протягом часу горіння, а маса рівномірно зменшується на масу палива. Без цього — чиста балістика від готової початкової швидкості.</span></span>
+                    <input type="checkbox" id="toggleEngine" onchange="toggleEngineFields()"> Двигун (тяга + паливо)
+                    <span class="field-tip">ⓘ<span class="field-tip-content">Додає фазу активного розгону: двигун штовхає ракету постійною тягою протягом часу горіння, а маса рівномірно зменшується на масу палива. Без цього - чиста балістика від готової початкової швидкості.</span></span>
                 </label>
                 <label class="create-checkbox">
-                    <input type="checkbox" id="toggleParachute" onchange="toggleParachuteFields()"> 🪂 Парашут
-                    <span class="field-tip">ⓘ<span class="field-tip-content">Інший (зазвичай значно більший) коефіцієнт опору й площа, що автоматично «розкриваються» в момент початку падіння — тобто на апогеї, коли вертикальна швидкість переходить у мінус.</span></span>
+                    <input type="checkbox" id="toggleParachute" onchange="toggleParachuteFields()"> Парашут
+                    <span class="field-tip">ⓘ<span class="field-tip-content">Інший (зазвичай значно більший) коефіцієнт опору й площа, що автоматично «розкриваються» в момент початку падіння - тобто на апогеї, коли вертикальна швидкість переходить у мінус.</span></span>
                 </label>
                 <label class="create-checkbox" id="dispersionToggleLabel">
-                    <input type="checkbox" id="toggleDispersion" onchange="toggleDispersionFields()"> 📊 Monte Carlo розкид замість одного запуску
-                    <span class="field-tip">ⓘ<span class="field-tip-content">Замість одної траєкторії — прогонить N симуляцій з випадковим шумом на кут і швидкість, і покаже розкид точок приземлення (середнє і стандартне відхилення) замість анімації польоту.</span></span>
+                    <input type="checkbox" id="toggleDispersion" onchange="toggleDispersionFields()"> Monte Carlo розкид замість одного запуску
+                    <span class="field-tip">ⓘ<span class="field-tip-content">Замість одної траєкторії - прогонить N симуляцій з випадковим шумом на кут і швидкість, і покаже розкид точок приземлення (середнє і стандартне відхилення) замість анімації польоту.</span></span>
                 </label>
             </div>
 
@@ -101,7 +101,7 @@
                 </label>
                 <label>
                     <span class="field-label-text">Час горіння, с
-                        <span class="field-tip">ⓘ<span class="field-tip-content">Скільки секунд двигун працює із заданою тягою. Після цього — вільний політ (балістика).</span></span>
+                        <span class="field-tip">ⓘ<span class="field-tip-content">Скільки секунд двигун працює із заданою тягою. Після цього - вільний політ (балістика).</span></span>
                     </span>
                     <input type="number" id="createBurnTime" step="0.1" min="0.1" value="2">
                 </label>
@@ -116,13 +116,13 @@
             <div id="parachuteFields" class="create-fields hidden">
                 <label>
                     <span class="field-label-text">Коеф. опору парашута
-                        <span class="field-tip">ⓘ<span class="field-tip-content">Cd парашута в розкритому стані — зазвичай значно вищий за Cd самої ракети (типово 1.0–2.0).</span></span>
+                        <span class="field-tip">ⓘ<span class="field-tip-content">Cd парашута в розкритому стані - зазвичай значно вищий за Cd самої ракети (типово 1.0–2.0).</span></span>
                     </span>
                     <input type="number" id="createParaCd" step="0.1" min="0.1" value="1.5">
                 </label>
                 <label>
                     <span class="field-label-text">Площа парашута, м²
-                        <span class="field-tip">ⓘ<span class="field-tip-content">Площа парашута в розкритому стані — значно більша за переріз самої ракети, тому й гальмує сильніше.</span></span>
+                        <span class="field-tip">ⓘ<span class="field-tip-content">Площа парашута в розкритому стані - значно більша за переріз самої ракети, тому й гальмує сильніше.</span></span>
                     </span>
                     <input type="number" id="createParaArea" step="0.01" min="0.01" value="0.3">
                 </label>
@@ -131,7 +131,7 @@
             <div id="dispersionFields" class="create-fields hidden">
                 <label>
                     <span class="field-label-text">К-сть прогонів
-                        <span class="field-tip">ⓘ<span class="field-tip-content">Скільки симуляцій прогнати (10–500). Більше прогонів — точніша статистика розкиду, але довше рахується.</span></span>
+                        <span class="field-tip">ⓘ<span class="field-tip-content">Скільки симуляцій прогнати (10–500). Більше прогонів - точніша статистика розкиду, але довше рахується.</span></span>
                     </span>
                     <input type="number" id="createTrials" step="10" min="10" max="500" value="200">
                 </label>
@@ -150,7 +150,7 @@
             </div>
 
             <div class="create-actions">
-                <button id="createOptimalBtn" onclick="findOptimalAngle()" title="Знайти кут з максимальною дальністю (golden-section search)">🎯 Оптимальний кут</button>
+                <button id="createOptimalBtn" onclick="findOptimalAngle()" title="Знайти кут з максимальною дальністю (golden-section search)">Оптимальний кут</button>
                 <button id="createSubmitBtn" onclick="submitCreateSimulation()">▶ Запустити</button>
                 <button onclick="exitCreateMode()">✕ Скасувати</button>
             </div>

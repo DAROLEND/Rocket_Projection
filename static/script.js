@@ -38,7 +38,7 @@ async function populateSimSelect(preferredId = null) {
   list.forEach(sim => {
     const option = document.createElement('option');
     option.value = sim.id;
-    option.textContent = `#${sim.id} — апогей ${sim.apogee.toFixed(1)}м, дальність ${sim.landing_x.toFixed(1)}м`;
+    option.textContent = `#${sim.id} - апогей ${sim.apogee.toFixed(1)}м, дальність ${sim.landing_x.toFixed(1)}м`;
     select.appendChild(option);
   });
 
@@ -213,28 +213,10 @@ function niceCeil(value) {
 }
 
 function interpolateAt(t) {
-  if (t <= trajectory[0][1]) return trajectory[0];
-  if (t >= maxT) return trajectory[trajectory.length - 1];
-
-  for (let i = 0; i < trajectory.length - 1; i++) {
-    const a = trajectory[i], b = trajectory[i + 1];
-    if (t >= a[1] && t <= b[1]) {
-      const k = (t - a[1]) / (b[1] - a[1] || 1);
-      return [
-        a[0], t,
-        a[2] + k * (b[2] - a[2]),
-        a[3] + k * (b[3] - a[3]),
-        a[4] + k * (b[4] - a[4]),
-        a[5] + k * (b[5] - a[5]),
-      ];
-    }
-  }
-  return trajectory[trajectory.length - 1];
+  return interpolateAtGeneric(trajectory, maxT, t);
 }
 
-function drawFrame() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+function drawGroundLine() {
   const ground = toScreen(0, 0);
   ctx.strokeStyle = '#475569';
   ctx.lineWidth = 1;
@@ -242,18 +224,16 @@ function drawFrame() {
   ctx.moveTo(0, ground.sy);
   ctx.lineTo(canvas.width, ground.sy);
   ctx.stroke();
+  return ground;
+}
 
-  const fixedScale = document.getElementById('fixedScale').checked;
-  const maxY = (fixedScale && globalMaxY) ? globalMaxY / 1.15 : Math.max(...trajectory.map(p => p[3]));
-  const maxX = (fixedScale && globalMaxX) ? globalMaxX : Math.max(...trajectory.map(p => p[2]));
-
+function drawAxesGrid(maxX, xLimit, maxY, yLimit) {
   ctx.strokeStyle = 'rgba(148, 163, 184, 0.1)';
   ctx.fillStyle = '#64748b';
   ctx.font = '11px sans-serif';
   ctx.lineWidth = 1;
 
   const yStep = niceStep(maxY);
-  const yLimit = fixedScale && globalMaxY ? globalMaxY : maxY * 1.15;
   for (let yVal = 0; yVal <= yLimit; yVal += yStep) {
     const { sy } = toScreen(0, yVal);
     ctx.beginPath();
@@ -265,7 +245,6 @@ function drawFrame() {
   }
 
   const xStep = niceStep(maxX);
-  const xLimit = fixedScale && globalMaxX ? globalMaxX : maxX;
   for (let xVal = 0; xVal <= xLimit; xVal += xStep) {
     const { sx } = toScreen(xVal, 0);
     ctx.beginPath();
@@ -275,6 +254,29 @@ function drawFrame() {
     ctx.textAlign = 'center';
     ctx.fillText(`${xVal.toFixed(0)}м`, sx, canvas.height - PADDING + 16);
   }
+}
+
+function drawRocketIcon(sx, sy, angle, fontSize = 24) {
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.rotate(-angle);
+  ctx.font = `${fontSize}px serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('🚀', 0, 0);
+  ctx.restore();
+}
+
+function drawFrame() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawGroundLine();
+
+  const fixedScale = document.getElementById('fixedScale').checked;
+  const maxY = (fixedScale && globalMaxY) ? globalMaxY / 1.15 : Math.max(...trajectory.map(p => p[3]));
+  const maxX = (fixedScale && globalMaxX) ? globalMaxX : Math.max(...trajectory.map(p => p[2]));
+  const yLimit = fixedScale && globalMaxY ? globalMaxY : maxY * 1.15;
+  const xLimit = fixedScale && globalMaxX ? globalMaxX : maxX;
+  drawAxesGrid(maxX, xLimit, maxY, yLimit);
 
   ctx.strokeStyle = 'rgba(96, 165, 250, 0.5)';
   ctx.lineWidth = 2;
@@ -297,15 +299,7 @@ function drawFrame() {
   const [, , x, y, vx, vy] = interpolateAt(simTime);
   const { sx, sy } = toScreen(x, Math.max(y, 0));
   const angle = Math.atan2(-vy, vx);
-
-  ctx.save();
-  ctx.translate(sx, sy);
-  ctx.rotate(-angle);
-  ctx.font = '24px serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('🚀', 0, 0);
-  ctx.restore();
+  drawRocketIcon(sx, sy, angle, 24);
 
   updateTelemetry(interpolateAt(simTime));
 }
@@ -501,7 +495,7 @@ async function streamAgentReply(question) {
     currentBubble = null;
     const traceEl = document.createElement('div');
     traceEl.className = 'chat-trace';
-    traceEl.textContent = `🔧 ${label}`;
+    traceEl.textContent = label;
     messagesEl.appendChild(traceEl);
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
@@ -630,13 +624,17 @@ let compareSims = []; // [{id, trajectory, maxT, apogee, flight_time, landing_x,
 let compareMaxT = 0;
 let selectedCompareIds = new Set();
 
+function setCreateBaseFields(values) {
+  document.getElementById('createMass').value = values.mass;
+  document.getElementById('createV0').value = values.v0;
+  document.getElementById('createAngle').value = values.angle_deg;
+  document.getElementById('createDrag').value = values.drag_coefficient;
+  document.getElementById('createArea').value = values.cross_section_area;
+  document.getElementById('createMethod').value = values.integration_method || 'euler';
+}
+
 function resetCreateFormDefaults() {
-  document.getElementById('createMass').value = 0.5;
-  document.getElementById('createV0').value = 40;
-  document.getElementById('createAngle').value = 45;
-  document.getElementById('createDrag').value = 0.47;
-  document.getElementById('createArea').value = 0.03;
-  document.getElementById('createMethod').value = 'euler';
+  setCreateBaseFields({ mass: 0.5, v0: 40, angle_deg: 45, drag_coefficient: 0.47, cross_section_area: 0.03, integration_method: 'euler' });
 
   document.getElementById('toggleEngine').checked = false;
   toggleEngineFields();
@@ -681,12 +679,7 @@ function openEditMode() {
   document.getElementById('createError').textContent = '';
   document.getElementById('createNote').textContent = '';
 
-  document.getElementById('createMass').value = currentSimData.mass;
-  document.getElementById('createV0').value = currentSimData.v0;
-  document.getElementById('createAngle').value = currentSimData.angle_deg;
-  document.getElementById('createDrag').value = currentSimData.drag_coefficient;
-  document.getElementById('createArea').value = currentSimData.cross_section_area;
-  document.getElementById('createMethod').value = currentSimData.integration_method || 'euler';
+  setCreateBaseFields(currentSimData);
 
   const hasEngine = currentSimData.thrust != null;
   document.getElementById('toggleEngine').checked = hasEngine;
@@ -710,7 +703,7 @@ function openEditMode() {
   document.getElementById('dispersionToggleLabel').classList.add('hidden');
 
   document.getElementById('createHeaderTitle').textContent = `Редагування симуляції #${editingSimulationId}:`;
-  document.getElementById('createSubmitBtn').textContent = '💾 Зберегти зміни';
+  document.getElementById('createSubmitBtn').textContent = 'Зберегти зміни';
 
   document.getElementById('createPanel').classList.add('open');
 }
@@ -728,7 +721,7 @@ function toggleParachuteFields() {
 function toggleDispersionFields() {
   const on = document.getElementById('toggleDispersion').checked;
   document.getElementById('dispersionFields').classList.toggle('hidden', !on);
-  document.getElementById('createSubmitBtn').textContent = on ? '📊 Показати розкид' : '▶ Запустити';
+  document.getElementById('createSubmitBtn').textContent = on ? 'Показати розкид' : '▶ Запустити';
 }
 
 function readBaseCreateFields() {
@@ -782,7 +775,7 @@ async function findOptimalAngle() {
 
     const data = await res.json();
     document.getElementById('createAngle').value = data.angle_deg;
-    noteEl.textContent = `Оптимальний кут: ${data.angle_deg}° → дальність ${data.landing_x.toFixed(1)} м`;
+    noteEl.textContent = `Оптимальний кут: ${data.angle_deg}°, дальність ${data.landing_x.toFixed(1)} м`;
   } catch (err) {
     errorEl.textContent = 'Не вдалося зв\'язатись із сервером.';
   } finally {
@@ -931,13 +924,7 @@ function drawDispersionFrame() {
   scaleX = (canvas.width - 2 * PADDING) / (maxX || 1);
   scaleY = (canvas.height - 2 * PADDING) / (maxY || 1);
 
-  const ground = toScreen(0, 0);
-  ctx.strokeStyle = '#475569';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(0, ground.sy);
-  ctx.lineTo(canvas.width, ground.sy);
-  ctx.stroke();
+  const ground = drawGroundLine();
 
   ctx.strokeStyle = 'rgba(96, 165, 250, 0.5)';
   ctx.lineWidth = 2;
@@ -1115,44 +1102,11 @@ function renderCompareLegend() {
 
 function drawCompareFrame() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  const ground = toScreen(0, 0);
-  ctx.strokeStyle = '#475569';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(0, ground.sy);
-  ctx.lineTo(canvas.width, ground.sy);
-  ctx.stroke();
+  drawGroundLine();
 
   const maxY = Math.max(...compareSims.map(s => Math.max(...s.trajectory.map(p => p[3]))));
   const maxX = Math.max(...compareSims.map(s => Math.max(...s.trajectory.map(p => p[2]))));
-
-  ctx.strokeStyle = 'rgba(148, 163, 184, 0.1)';
-  ctx.fillStyle = '#64748b';
-  ctx.font = '11px sans-serif';
-  ctx.lineWidth = 1;
-
-  const yStep = niceStep(maxY);
-  for (let yVal = 0; yVal <= maxY * 1.15; yVal += yStep) {
-    const { sy } = toScreen(0, yVal);
-    ctx.beginPath();
-    ctx.moveTo(PADDING, sy);
-    ctx.lineTo(canvas.width - 10, sy);
-    ctx.stroke();
-    ctx.textAlign = 'right';
-    ctx.fillText(`${yVal.toFixed(0)}м`, PADDING - 6, sy + 4);
-  }
-
-  const xStep = niceStep(maxX);
-  for (let xVal = 0; xVal <= maxX; xVal += xStep) {
-    const { sx } = toScreen(xVal, 0);
-    ctx.beginPath();
-    ctx.moveTo(sx, 10);
-    ctx.lineTo(sx, canvas.height - PADDING);
-    ctx.stroke();
-    ctx.textAlign = 'center';
-    ctx.fillText(`${xVal.toFixed(0)}м`, sx, canvas.height - PADDING + 16);
-  }
+  drawAxesGrid(maxX, maxX, maxY, maxY * 1.15);
 
   compareSims.forEach(sim => {
     ctx.strokeStyle = sim.color + '40';
@@ -1179,15 +1133,7 @@ function drawCompareFrame() {
     const [, , x, y, vx, vy] = point;
     const { sx, sy } = toScreen(x, Math.max(y, 0));
     const angle = Math.atan2(-vy, vx);
-
-    ctx.save();
-    ctx.translate(sx, sy);
-    ctx.rotate(-angle);
-    ctx.font = '20px serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('🚀', 0, 0);
-    ctx.restore();
+    drawRocketIcon(sx, sy, angle, 20);
   });
 
   updateCompareTelemetry();
