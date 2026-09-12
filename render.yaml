@@ -27,7 +27,10 @@ services:
     dockerfilePath: ./Dockerfile
     dockerContext: .
     plan: free
-    healthCheckPath: /
+    # Points directly at the static file (200, no redirect) rather than "/" —
+    # "/" now 302s straight to the visualizer, and Render's health checker
+    # doesn't follow redirects.
+    healthCheckPath: /static/index.html
     envVars:
       - key: ANTHROPIC_API_KEY
         sync: false # set in the Render dashboard after first deploy

@@ -338,6 +338,7 @@ function animate(ts) {
 }
 
 let dragging = false;
+const DRAG_GRAB_RADIUS = 24; // generous enough for a fingertip, not just a mouse pointer
 
 function getRocketScreenPos() {
   const [, , x, y] = interpolateAt(simTime);
@@ -362,33 +363,54 @@ function findNearestTimeByX(worldX) {
   return closest[1];
 }
 
-canvas.addEventListener('mousedown', (e) => {
+// Shared by mouse and touch input, so the drag-to-scrub interaction works
+// the same way whether it's a cursor or a finger on the canvas.
+function dragStart(clientX, clientY) {
   if (compareMode || trajectory.length === 0) return;
   const rect = canvas.getBoundingClientRect();
-  const mouseX = e.clientX - rect.left;
-  const mouseY = e.clientY - rect.top;
+  const x = clientX - rect.left;
+  const y = clientY - rect.top;
 
-  if (distanceToRocket(mouseX, mouseY) < 20) {
+  if (distanceToRocket(x, y) < DRAG_GRAB_RADIUS) {
     dragging = true;
     playing = false;
     document.getElementById('playBtn').textContent = '▶ Play';
     canvas.classList.add('dragging');
   }
-});
+}
 
-canvas.addEventListener('mousemove', (e) => {
+function dragMove(clientX) {
   if (!dragging) return;
   const rect = canvas.getBoundingClientRect();
-  const mouseX = e.clientX - rect.left;
-  const world = screenToWorld(mouseX, 0);
+  const x = clientX - rect.left;
+  const world = screenToWorld(x, 0);
   simTime = findNearestTimeByX(world.x);
   drawFrame();
-});
+}
 
-window.addEventListener('mouseup', () => {
+function dragEnd() {
   dragging = false;
   canvas.classList.remove('dragging');
-});
+}
+
+canvas.addEventListener('mousedown', (e) => dragStart(e.clientX, e.clientY));
+canvas.addEventListener('mousemove', (e) => dragMove(e.clientX));
+window.addEventListener('mouseup', dragEnd);
+
+canvas.addEventListener('touchstart', (e) => {
+  const t = e.touches[0];
+  dragStart(t.clientX, t.clientY);
+  if (dragging) e.preventDefault(); // only steal the gesture once we've actually grabbed the rocket
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  if (!dragging) return;
+  e.preventDefault();
+  dragMove(e.touches[0].clientX);
+}, { passive: false });
+
+canvas.addEventListener('touchend', dragEnd);
+canvas.addEventListener('touchcancel', dragEnd);
 
 document.getElementById('telTimeInput').addEventListener('change', (e) => {
   if (trajectory.length === 0) return;
@@ -1176,5 +1198,38 @@ function updateCompareTelemetry() {
   document.getElementById('telemetryCompare').innerHTML = html;
 }
 
+// Canvas has no fixed pixel size — it's sized off its wrapper's actual rendered
+// width (CSS handles the responsive layout, this keeps the *drawing* coordinate
+// space, i.e. canvas.width/height that computeScale()/toScreen() work in, in
+// sync with it) so the trajectory plot fits phone screens instead of overflowing
+// a fixed 700px canvas.
+const CANVAS_ASPECT = 420 / 700;
+let resizeTimer = null;
+
+function resizeCanvas() {
+  const cssWidth = Math.max(Math.round(canvas.parentElement.clientWidth), 1);
+  const cssHeight = Math.round(cssWidth * CANVAS_ASPECT);
+  if (canvas.width === cssWidth && canvas.height === cssHeight) return;
+
+  canvas.width = cssWidth;
+  canvas.height = cssHeight;
+
+  if (compareMode) {
+    computeCompareScale();
+    drawCompareFrame();
+  } else if (dispersionMode) {
+    drawDispersionFrame();
+  } else if (trajectory.length) {
+    computeScale();
+    drawFrame();
+  }
+}
+
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(resizeCanvas, 150);
+});
+
+resizeCanvas();
 populateSimSelect();
 updateSpeedLabel();

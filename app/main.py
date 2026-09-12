@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 import anyio
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -52,18 +52,12 @@ app = FastAPI(
 app.mount("/static", StaticFiles(directory="static", html=True), name="static")
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/", include_in_schema=False)
 async def root():
-    return """
-    <html>
-      <head><meta charset="UTF-8"><title>Rocket Trajectory API</title></head>
-      <body style="font-family: sans-serif; text-align: center; margin-top: 100px;">
-        <h1>Rocket Trajectory API</h1>
-        <p><a href="/docs">Swagger docs</a></p>
-        <p><a href="/static/index.html" style="font-size: 18px; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 8px;">Відкрити візуалізацію</a></p>
-      </body>
-    </html>
-    """
+    # Straight to the visualizer — that's what anyone opening this link actually
+    # wants to see, not a pick-your-own-adventure landing page. Swagger docs are
+    # still at /docs for anyone who wants them, just not linked from here anymore.
+    return RedirectResponse(url="/static/index.html")
 
 
 @app.post("/simulate", response_model=SimulationDetail, tags=["simulations"], summary="Запустити нову симуляцію")
