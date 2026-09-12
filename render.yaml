@@ -8,15 +8,17 @@
 #
 # What this deploys:
 #   - a free Web Service running the existing Dockerfile (uvicorn)
-# What to know:
-#   - Render's free plan has no persistent disk. SQLite (rocket.db) and
-#     the ChromaDB index (chroma_data/) live on the container's local
-#     filesystem, so both reset on every deploy and whenever the free
-#     instance is rescheduled. Fine for a demo — simulations created
-#     during a session survive until the next deploy/restart, not
-#     forever. If real persistence is needed later: move Simulation rows
-#     to a free Postgres (Supabase/Neon) and re-derive the ChromaDB index
-#     from them on startup, same pattern as CoffeeTime's DB_* setup.
+# What it does NOT deploy:
+#   - the database — bring your own free Postgres (Supabase, Neon, ...).
+#     The service just connects to it over the network via DB_*. On boot
+#     it creates the schema itself (no Alembic here, just a lightweight
+#     ad-hoc migration — see app/database.py) against a fresh, empty
+#     database, and re-derives the ChromaDB search index from whatever
+#     simulations are already in Postgres — so the free instance having
+#     no persistent disk for chroma_data/ doesn't actually lose anything.
+#   - DB_* left unset entirely falls back to a local SQLite file instead,
+#     which *does* reset on every redeploy/restart — fine for a quick
+#     look, not for anything you want to survive a deploy.
 
 services:
   - type: web
@@ -29,3 +31,13 @@ services:
     envVars:
       - key: ANTHROPIC_API_KEY
         sync: false # set in the Render dashboard after first deploy
+      - key: DB_HOST
+        sync: false # e.g. Supabase's db.<project-ref>.supabase.co, or Neon's host
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASS
+        sync: false

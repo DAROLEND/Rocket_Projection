@@ -17,6 +17,26 @@ def build_description(simulation) -> str:
     )
 
 
+def reindex_all(simulations) -> None:
+    """Re-embed and upsert every simulation at once — called on app startup so the
+    ChromaDB index survives an environment where its own storage doesn't (e.g. Render's
+    free tier has no persistent disk: chroma_data/ is empty on every boot, but Postgres
+    still has every simulation, so this rebuilds the index from that source of truth).
+    A no-op, cheap query on an empty table when there's nothing to index yet."""
+    if not simulations:
+        return
+
+    descriptions = [build_description(s) for s in simulations]
+    embeddings = _embedding_model.encode(descriptions).tolist()
+
+    _collection.upsert(
+        ids=[str(s.id) for s in simulations],
+        embeddings=embeddings,
+        documents=descriptions,
+        metadatas=[{"simulation_id": s.id} for s in simulations],
+    )
+
+
 def index_simulation(simulation) -> None:
     description = build_description(simulation)
     embedding = _embedding_model.encode(description).tolist()

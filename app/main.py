@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.database import engine, Base, get_db, ensure_schema_migrated
+from app.database import engine, Base, get_db, async_session, ensure_schema_migrated
 from app.models import Simulation
 from app.schemas import (
     SimulationCreate,
@@ -22,7 +22,7 @@ from app.schemas import (
     DispersionResponse,
 )
 from app.simulation_service import run_simulation, find_optimal_angle, run_dispersion
-from app.rag_service import index_simulation, answer_question, _collection
+from app.rag_service import index_simulation, reindex_all, answer_question, _collection
 from app.agent import run_agent, run_agent_stream
 
 
@@ -31,6 +31,11 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await ensure_schema_migrated(conn)
+
+    async with async_session() as session:
+        result = await session.execute(select(Simulation))
+        reindex_all(result.scalars().all())
+
     yield
 
 
