@@ -31,6 +31,20 @@ def run_simulation(
     env = SimulationEnvironment()
     trajectory = env.simulate(rocket, method=integration_method)
 
+    # simulate() stops either at landing (interpolated to exactly y=0) or at the
+    # max_time safety cutoff, whichever comes first. If it's the latter and the
+    # rocket is still airborne, "apogee"/"flight_time"/"landing_x" below would
+    # describe mid-flight state, not an actual landing — better to say so than
+    # to quietly hand back numbers that look final but aren't.
+    if trajectory[-1][3] > 0:
+        raise ValueError(
+            f"Ракета не приземлилась за {env.max_time:.0f}с (безпечний ліміт симуляції) — "
+            f"на момент обриву вона все ще на висоті {trajectory[-1][3]:.0f}м і рухається "
+            f"зі швидкістю {math.hypot(trajectory[-1][4], trajectory[-1][5]):.0f}м/с. "
+            "Тяга/час горіння двигуна, ймовірно, задають надто потужний політ для цієї "
+            "моделі. Зменши тягу чи час горіння, або додай парашут, щоб пришвидшити зниження."
+        )
+
     apogee = max(point[3] for point in trajectory)  # y_val — індекс 3
     flight_time = trajectory[-1][1]                  # t_val останньої точки
     max_velocity = max(math.sqrt(p[4] ** 2 + p[5] ** 2) for p in trajectory)

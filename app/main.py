@@ -1,8 +1,8 @@
 from contextlib import asynccontextmanager
 import anyio
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse, StreamingResponse
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -50,6 +50,15 @@ app = FastAPI(
 )
 
 app.mount("/static", StaticFiles(directory="static", html=True), name="static")
+
+
+@app.exception_handler(ValueError)
+async def value_error_handler(request: Request, exc: ValueError):
+    # run_simulation() raises plain ValueError for physically-meaningful input
+    # problems (e.g. the rocket never lands within the safety time limit) — same
+    # "detail" shape as FastAPI's own validation errors, so the frontend's
+    # existing error handling picks it up without any special-casing.
+    return JSONResponse(status_code=422, content={"detail": str(exc)})
 
 
 @app.get("/", include_in_schema=False)

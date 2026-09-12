@@ -46,3 +46,15 @@ def test_dispersion_zero_noise_collapses_to_nominal():
         trials=20, angle_std_deg=0.0, v0_std_pct=0.0,
     )
     assert result["landing_x_std"] == pytest.approx(0.0, abs=1e-9)
+
+
+def test_run_simulation_rejects_a_flight_that_never_lands():
+    """An overpowered, long-burning engine can still be climbing when the
+    max_time safety cutoff hits — run_simulation must say so explicitly rather
+    than silently handing back mid-flight numbers as if they were the landing."""
+    with pytest.raises(ValueError, match="не приземлилась"):
+        run_simulation(
+            mass=50.0, drag_coefficient=0.1, cross_section_area=0.01,
+            v0=10.0, angle_deg=90.0,
+            thrust=50000.0, burn_time=100.0, propellant_mass=5.0,
+        )

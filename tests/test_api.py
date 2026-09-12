@@ -143,6 +143,18 @@ async def test_update_missing_simulation_returns_404(client):
     assert res.status_code == 404
 
 
+async def test_simulate_rejects_a_flight_that_never_lands(client):
+    payload = {
+        **SAMPLE_SIMULATION,
+        "mass": 50.0, "drag_coefficient": 0.1, "cross_section_area": 0.01,
+        "v0": 10.0, "angle_deg": 90.0,
+        "thrust": 50000.0, "burn_time": 100.0, "propellant_mass": 5.0,
+    }
+    res = await client.post("/simulate", json=payload)
+    assert res.status_code == 422
+    assert "не приземлилась" in res.json()["detail"]
+
+
 async def test_dispersion_endpoint_caps_trials():
     res_json = {
         **SAMPLE_SIMULATION, "trials": 5000, "angle_std_deg": 1.0, "v0_std_pct": 2.0,

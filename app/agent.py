@@ -312,7 +312,12 @@ async def run_agent(message: str, db: AsyncSession, session_id: str | None = Non
         tool_results = []
         for block in response.content:
             if block.type == "tool_use":
-                result_text, sim_id, compare_ids = await _execute_tool(block.name, block.input, db)
+                try:
+                    result_text, sim_id, compare_ids = await _execute_tool(block.name, block.input, db)
+                except ValueError as e:
+                    # e.g. run_simulation() rejecting physically-unrealistic input (never
+                    # lands within the time limit) — tell the agent, not the user's browser.
+                    result_text, sim_id, compare_ids = str(e), None, None
                 if sim_id is not None:
                     last_simulation_id = sim_id
                 if compare_ids is not None:
@@ -374,7 +379,12 @@ async def run_agent_stream(message: str, session_id: str | None = None) -> Async
             for block in response.content:
                 if block.type == "tool_use":
                     yield _sse({"type": "tool_call", "name": block.name, "input": block.input})
-                    result_text, sim_id, compare_ids = await _execute_tool(block.name, block.input, db)
+                    try:
+                        result_text, sim_id, compare_ids = await _execute_tool(block.name, block.input, db)
+                    except ValueError as e:
+                        # e.g. run_simulation() rejecting physically-unrealistic input (never
+                        # lands within the time limit) — tell the agent, not the user's browser.
+                        result_text, sim_id, compare_ids = str(e), None, None
                     if sim_id is not None:
                         last_simulation_id = sim_id
                     if compare_ids is not None:
