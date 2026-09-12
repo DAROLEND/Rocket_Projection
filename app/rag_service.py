@@ -1,9 +1,16 @@
 import chromadb
-from sentence_transformers import SentenceTransformer
+from chromadb.utils.embedding_functions.onnx_mini_lm_l6_v2 import ONNXMiniLM_L6_V2
 
-_embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+# Same all-MiniLM-L6-v2 model as sentence-transformers, but running on onnxruntime
+# instead of full PyTorch — no torch dependency, a fraction of the RAM. Matters a
+# lot on a 512MB free-tier container, where loading torch alone blew past the limit.
+_embedding_model = ONNXMiniLM_L6_V2()
 _chroma_client = chromadb.PersistentClient(path="./chroma_data")
 _collection = _chroma_client.get_or_create_collection(name="simulations")
+
+
+def _embed(texts: list[str]) -> list[list[float]]:
+    return [vector.tolist() for vector in _embedding_model(texts)]
 
 
 def build_description(simulation) -> str:
@@ -27,7 +34,7 @@ def reindex_all(simulations) -> None:
         return
 
     descriptions = [build_description(s) for s in simulations]
-    embeddings = _embedding_model.encode(descriptions).tolist()
+    embeddings = _embed(descriptions)
 
     _collection.upsert(
         ids=[str(s.id) for s in simulations],
@@ -39,7 +46,7 @@ def reindex_all(simulations) -> None:
 
 def index_simulation(simulation) -> None:
     description = build_description(simulation)
-    embedding = _embedding_model.encode(description).tolist()
+    embedding = _embed([description])[0]
 
     # upsert (not add) — editing an existing simulation re-indexes the same id
     # with a fresh description/embedding instead of erroring on a duplicate.
@@ -52,7 +59,7 @@ def index_simulation(simulation) -> None:
 
 
 def search_similar_with_ids(query: str, top_k: int = 3) -> list[tuple[int, str]]:
-    query_embedding = _embedding_model.encode(query).tolist()
+    query_embedding = _embed([query])[0]
     results = _collection.query(
         query_embeddings=[query_embedding],
         n_results=top_k,
