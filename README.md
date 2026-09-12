@@ -1,129 +1,131 @@
 # Rocket Trajectory API
 
-> 🔗 Живий сайт: **[rocket-projection.onrender.com](https://rocket-projection.onrender.com)** — сервіс на безкоштовному плані Render засинає після 15 хв бездіяльності, тож перше відкриття може зайняти до хвилини.
+*Також доступно [українською](README.uk.md).*
 
-Бекенд, що симулює політ ракети з опором повітря, і шар над ним, який дозволяє питати про ці дані природною мовою та керувати симуляціями через AI-агента. Почалось як звичайна фізична задача — порахувати траєкторію кинутого під кутом тіла — а виросло в невеликий, але закінчений стек: async API, база даних, векторний пошук, чат-агент із tool use і власний canvas-візуалізатор без жодного фронтенд-фреймворка.
+> 🔗 Live site: **[rocket-projection.onrender.com](https://rocket-projection.onrender.com)** — hosted on Render's free tier, which sleeps after 15 minutes of inactivity, so the first load can take up to a minute.
 
-## Скріншоти
+A backend that simulates rocket flight with air resistance, plus a layer on top that lets you query that data in natural language and drive simulations through an AI agent. It started as a plain physics problem — computing the trajectory of a body launched at an angle — and grew into a small but complete stack: an async API, a database, vector search, a tool-use chat agent, and a custom canvas visualizer with no frontend framework.
+
+## Screenshots
 
 | | |
 |---|---|
-| ![Порівняння симуляцій + агент](static/images/preview/compare.png) | ![Форма створення: двигун, парашут, оптимальний кут](static/images/preview/create-form.png) |
-| **Порівняння** — кілька траєкторій одночасно, агент сам активує режим і коментує різницю | **Нова симуляція** — двигун, парашут, RK4/Euler, пошук оптимального кута прямо з форми |
-| ![Телеметрія + RAG-питання](static/images/preview/ask.png) | ![Редагування існуючої симуляції](static/images/preview/edit-form.png) |
-| **Телеметрія і RAG** — драг по траєкторії, і чат-режим «Питання» з confidence-беджем та посиланнями на симуляції | **Редагування** — та сама форма, але перераховує вже існуючу симуляцію на місці (той самий id), а не створює нову |
+| ![Simulation comparison + agent](static/images/preview/compare.png) | ![Creation form: engine, parachute, optimal angle](static/images/preview/create-form.png) |
+| **Comparison** — multiple trajectories at once, the agent switches to comparison mode on its own and comments on the differences | **New simulation** — engine, parachute, RK4/Euler, optimal-angle search right from the form |
+| ![Telemetry + RAG question](static/images/preview/ask.png) | ![Editing an existing simulation](static/images/preview/edit-form.png) |
+| **Telemetry and RAG** — drag along the trajectory, plus an "Ask" chat mode with a confidence badge and links to the simulations it drew on | **Editing** — the same form, but recomputes an existing simulation in place (same id) instead of creating a new one |
 
-## Що вміє
+## What it does
 
-- Рахує траєкторію ракети з опором повітря двома методами інтегрування (Euler і RK4), опційно з двигуном (тяга, час горіння, витрата палива) і парашутом, що розкривається на апогеї.
-- Шукає кут запуску з максимальною дальністю. Без опору повітря відповідь завжди 45°, зі спротивом повітря формули вже нема — кут шукається чисельно, golden-section search'ем.
-- Рахує Monte Carlo розкид приземлення: прогонить той самий запуск сотні разів з невеликим шумом на кут і швидкість і показує, наскільки розкидаються точки приземлення.
-- Відповідає на питання про минулі симуляції природною мовою (RAG: пошук по векторній базі ChromaDB → структурована відповідь від Claude).
-- Дає AI-агенту доступ до інструментів — запустити симуляцію, порівняти кілька, знайти оптимальний кут — з памʼяттю діалогу і стрімінгом відповіді в реальному часі.
-- Показує все це у власному візуалізаторі на канвасі: анімація польоту, перетягування точки на траєкторії мишкою, порівняння кількох запусків одночасно, форма створення нової симуляції прямо в інтерфейсі.
+- Computes rocket trajectory with air resistance using two integration methods (Euler and RK4), optionally with an engine (thrust, burn time, fuel consumption) and a parachute that deploys at apogee.
+- Finds the launch angle with maximum range. Without air resistance the answer is always 45°; with drag there's no closed-form formula anymore, so the angle is found numerically via golden-section search.
+- Computes Monte Carlo landing dispersion: runs the same launch hundreds of times with small noise added to angle and speed, and reports how spread out the landing points are.
+- Answers natural-language questions about past simulations (RAG: vector search over ChromaDB → structured answer from Claude).
+- Gives an AI agent access to tools — run a simulation, compare several, find the optimal angle — with conversation memory and real-time streaming of the response.
+- Displays all of this in a custom canvas visualizer: flight animation, dragging a point along the trajectory with the mouse, comparing multiple launches at once, and a form for creating a new simulation right in the UI.
 
-## Стек
+## Stack
 
-- **Backend:** FastAPI (async), SQLAlchemy 2.0 (async), SQLite локально / Postgres у продакшені
-- **AI/ML:** Claude API (Anthropic SDK, streaming + tool use), ChromaDB (embeddings — вбудований ONNX-варіант all-MiniLM-L6-v2, без torch), Instructor (structured output поверх Pydantic v2)
-- **Frontend:** чистий JS + HTML5 Canvas, без фреймворків
+- **Backend:** FastAPI (async), SQLAlchemy 2.0 (async), SQLite locally / Postgres in production
+- **AI/ML:** Claude API (Anthropic SDK, streaming + tool use), ChromaDB (embeddings via the built-in ONNX variant of all-MiniLM-L6-v2, no torch), Instructor (structured output on top of Pydantic v2)
+- **Frontend:** plain JS + HTML5 Canvas, no frameworks
 
-## Структура
+## Structure
 
 ```
 app/
-├── main.py                # FastAPI app, усі ендпоінти
-├── models.py               # SQLAlchemy модель Simulation
-├── schemas.py               # Pydantic схеми (request/response)
-├── database.py               # async engine, сесії
-├── config.py                  # pydantic-settings, читає .env
-├── simulation_service.py       # обгортка над фізикою (physics/)
+├── main.py                # FastAPI app, all endpoints
+├── models.py               # SQLAlchemy Simulation model
+├── schemas.py               # Pydantic schemas (request/response)
+├── database.py               # async engine, sessions
+├── config.py                  # pydantic-settings, reads .env
+├── simulation_service.py       # wrapper over the physics (physics/)
 ├── rag_service.py                # embeddings + ChromaDB + /ask (RAG)
-└── agent.py                       # tool-use агент: памʼять діалогу + NDJSON-стрімінг
+└── agent.py                       # tool-use agent: conversation memory + NDJSON streaming
 
 physics/
-├── rocket.py               # клас Rocket
-└── environment.py           # клас SimulationEnvironment — інтегрування руху з опором повітря
+├── rocket.py               # Rocket class
+└── environment.py           # SimulationEnvironment class — integrates motion with air resistance
 
 static/
-├── index.html               # UI: canvas-візуалізатор + телеметрія + чат
+├── index.html               # UI: canvas visualizer + telemetry + chat
 ├── style.css
-└── script.js                  # анімація, drag, порівняння симуляцій, чат
+└── script.js                  # animation, drag, simulation comparison, chat
 
 tests/
-├── test_physics.py           # фізика: апогей без опору, опір, двигун, парашут, Euler vs RK4
-├── test_optimization.py       # пошук кута, Monte Carlo розкид
-└── test_api.py                  # ендпоінти: create/list/get/delete/update, optimal-angle, dispersion
+├── test_physics.py           # physics: apogee without drag, drag, engine, parachute, Euler vs RK4
+├── test_optimization.py       # angle search, Monte Carlo dispersion
+└── test_api.py                  # endpoints: create/list/get/delete/update, optimal-angle, dispersion
 ```
 
 ## API
 
-- `POST /simulate` — нова симуляція (з опційним двигуном/парашутом/RK4)
-- `GET /simulations`, `GET /simulations/{id}` — список і деталі
-- `PUT /simulations/{id}` — перерахувати з новими параметрами (той самий id)
-- `DELETE /simulations/{id}` — видалення (з SQL і з ChromaDB)
-- `POST /simulate/optimal-angle` — знайти кут з максимальною дальністю
-- `POST /simulate/dispersion` — Monte Carlo розкид приземлення (тільки аналіз, у БД не зберігається)
-- `POST /ask` — питання природною мовою про існуючі симуляції (RAG)
-- `POST /agent/chat`, `POST /agent/chat/stream` — той самий агент з tool use, другий варіант стрімить NDJSON: токени відповіді плюс подія на кожен виклик інструменту
+- `POST /simulate` — new simulation (with optional engine/parachute/RK4)
+- `GET /simulations`, `GET /simulations/{id}` — list and details
+- `PUT /simulations/{id}` — recompute with new parameters (same id)
+- `DELETE /simulations/{id}` — deletion (from SQL and from ChromaDB)
+- `POST /simulate/optimal-angle` — find the angle with maximum range
+- `POST /simulate/dispersion` — Monte Carlo landing dispersion (analysis only, not stored in the DB)
+- `POST /ask` — natural-language questions about existing simulations (RAG)
+- `POST /agent/chat`, `POST /agent/chat/stream` — the same tool-use agent, the second variant streams NDJSON: response tokens plus an event for every tool call
 
-Повна інтерактивна документація — на `/docs`.
+Full interactive documentation is at `/docs`.
 
-## Запуск локально
+## Running locally
 
-Потрібен [uv](https://docs.astral.sh/uv/).
+Requires [uv](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync
-cp .env.example .env   # і вписати свій ANTHROPIC_API_KEY
+cp .env.example .env   # and fill in your ANTHROPIC_API_KEY
 uv run uvicorn app.main:app --reload
 ```
 
-Відкрити http://127.0.0.1:8000/static/index.html (візуалізатор) або http://127.0.0.1:8000/docs (Swagger).
+Open http://127.0.0.1:8000/static/index.html (visualizer) or http://127.0.0.1:8000/docs (Swagger).
 
-## Запуск у Docker
+## Running in Docker
 
 ```bash
 docker compose up --build
 ```
 
-Потрібен `.env` з `ANTHROPIC_API_KEY` у корені проєкту. Без `DB_*` у `.env` контейнер так само працює на локальному SQLite (`rocket.db` і `chroma_data/` підключені як volume, щоб дані не губились при перезапуску).
+Requires a `.env` with `ANTHROPIC_API_KEY` in the project root. Without `DB_*` in `.env`, the container still works fine on local SQLite (`rocket.db` and `chroma_data/` are mounted as volumes so data isn't lost on restart).
 
-## База даних: SQLite локально, Postgres у продакшені
+## Database: SQLite locally, Postgres in production
 
-Без `DB_HOST` у налаштуваннях застосунок сам падає на локальний файл `rocket.db` — для розробки не треба нічого піднімати окремо. Якщо `DB_HOST` заданий (у продакшені — вказує на безкоштовний Postgres від Supabase чи Neon), він переходить на нього через `asyncpg`. Схему застосунок піднімає сам при старті (без повноцінного Alembic — легка ad-hoc міграція в `app/database.py`, що працює з обома діалектами).
+Without `DB_HOST` in the settings, the app falls back to a local `rocket.db` file — nothing extra to set up for development. If `DB_HOST` is set (in production it points to a free Postgres from Supabase or Neon), it switches to that via `asyncpg`. The app creates its own schema on startup (no full Alembic setup — a lightweight ad-hoc migration in `app/database.py` that works with both dialects).
 
-ChromaDB (векторний індекс для `/ask`) все одно живе на локальному диску контейнера й не переживає редеплой на Render (free-план без постійного диска) — але це не проблема: при кожному старті застосунок перечитує всі симуляції з Postgres і перебудовує індекс наново (`reindex_all` в `rag_service.py`). Тобто джерело правди — завжди Postgres, Chroma можна втрачати й відновлювати.
+ChromaDB (the vector index for `/ask`) still lives on the container's local disk and doesn't survive a redeploy on Render (free plan, no persistent disk) — but that's not a problem: on every startup the app re-reads all simulations from Postgres and rebuilds the index from scratch (`reindex_all` in `rag_service.py`). So the source of truth is always Postgres; Chroma can be lost and rebuilt freely.
 
-## Деплой
+## Deployment
 
-Задеплоєно на [Render](https://render.com) як Docker Web Service, той самий підхід, що й в інших моїх проєктах (напр. [CoffeeTime](https://github.com/DAROLEND/CoffeeTime)) — через `render.yaml` (Blueprint):
+Deployed on [Render](https://render.com) as a Docker Web Service, the same approach as my other projects (e.g. [CoffeeTime](https://github.com/DAROLEND/CoffeeTime)) — via `render.yaml` (Blueprint):
 
-1. Завести безкоштовний Postgres на [Supabase](https://supabase.com) чи [Neon](https://neon.tech) і взяти звідти host/port/name/user/password.
-2. Запуштити репозиторій на GitHub (готово).
-3. У Render: **New → Blueprint**, підключити цей репозиторій — Render сам прочитає `render.yaml` і підніме сервіс.
-4. У налаштуваннях сервіса вписати секрети `ANTHROPIC_API_KEY` і `DB_HOST`/`DB_NAME`/`DB_USER`/`DB_PASS` (навмисно не в `render.yaml`, щоб не світилися в git).
-5. Увімкнути GitHub App для автодеплою на пуш: [github.com/settings/installations](https://github.com/settings/installations) → Render → додати цей репозиторій.
+1. Set up a free Postgres on [Supabase](https://supabase.com) or [Neon](https://neon.tech) and get the host/port/name/user/password from there.
+2. Push the repository to GitHub (done).
+3. In Render: **New → Blueprint**, connect this repository — Render reads `render.yaml` on its own and spins up the service.
+4. In the service settings, fill in the `ANTHROPIC_API_KEY` and `DB_HOST`/`DB_NAME`/`DB_USER`/`DB_PASS` secrets (deliberately not in `render.yaml`, so they don't end up in git).
+5. Enable the GitHub App for auto-deploy on push: [github.com/settings/installations](https://github.com/settings/installations) → Render → add this repository.
 
-Якщо `DB_*` не задати, сервіс все одно підніметься — просто на локальному SQLite-файлі контейнера, а тоді дані вже дійсно скидаються при кожному редеплої (free-план Render без постійного диска).
+If `DB_*` isn't set, the service still comes up fine — just on the container's local SQLite file, in which case data really is wiped on every redeploy (Render's free plan has no persistent disk).
 
-## Тести
+## Tests
 
 ```bash
 uv run pytest
 ```
 
-27 тестів: фізика (апогей без опору звіряється з аналітичною формулою, вплив опору/двигуна/парашута, узгодженість Euler і RK4), оптимізація (знайдений кут не гірший за 45°, розкид росте з шумом) і API (усі ендпоінти на окремій тестовій SQLite-базі, реальні `rocket.db` і ChromaDB-індекс не чіпаються).
+27 tests: physics (apogee without drag checked against the analytical formula, effects of drag/engine/parachute, Euler vs RK4 consistency), optimization (the angle found is never worse than 45°, dispersion grows with noise), and API (all endpoints against a separate test SQLite database — the real `rocket.db` and ChromaDB index are never touched).
 
-## Чесно про обмеження
+## Honest about the limitations
 
-- `confidence` у `/ask` — це самооцінка моделі (high/medium/low), а не метрика, привʼязана до реальної відстані ембеддінгів. Модель не завжди адекватно оцінює власну впевненість — правильний фікс прив'язати її до retrieval-score, але пороги для цього треба тюнити на реальних даних, тож поки лишив як є.
-- Памʼять діалогу агента живе в оперативній памʼяті процесу, без персистентності. Для демо достатньо, але не переживе перезапуск сервера чи кілька інстансів.
-- Ad-hoc міграція в `database.py` вміє тільки додавати нові nullable-колонки — для зміни типу колонки чи чогось складнішого знадобиться справжній Alembic (він у залежностях, але не підключений).
-- Free-план Render дає 512MB RAM — навіть після переходу з `sentence-transformers`/`torch` на легший ONNX-embedding з ChromaDB пік памʼяті під навантаженням впритул до ліміту (~460MB виміряно локально під кількома запитами підряд). Для демо-навантаження цього вистачає, але сплеск паралельних запитів теоретично може OOM-нути процес.
-- Двигун — спрощена модель (стала тяга + лінійне вигоряння маси), без рівняння Ціолковського й питомого імпульсу. Парашут розкривається миттєво в момент початку падіння, без затримки. Розкид Monte Carlo — тільки вздовж дальності, без бокового вітру.
-- Ендпоінти публічні, без автентифікації — навчальний проєкт, не production.
+- `confidence` in `/ask` is the model's self-assessment (high/medium/low), not a metric tied to actual embedding distance. The model doesn't always judge its own confidence well — the correct fix is to tie it to the retrieval score, but the thresholds for that need tuning on real data, so it's left as-is for now.
+- The agent's conversation memory lives in the process's RAM, with no persistence. Fine for a demo, but it won't survive a server restart or multiple instances.
+- The ad-hoc migration in `database.py` can only add new nullable columns — changing a column's type or anything more complex would need real Alembic (it's in the dependencies but not wired up).
+- Render's free plan gives 512MB of RAM — even after switching from `sentence-transformers`/`torch` to ChromaDB's lighter built-in ONNX embedding, peak memory under load sits right at the limit (~460MB measured locally under several requests in a row). That's enough for demo-level traffic, but a burst of concurrent requests could theoretically OOM the process.
+- The engine is a simplified model (constant thrust + linear mass burn), without the Tsiolkovsky rocket equation or specific impulse. The parachute deploys instantly the moment the fall begins, with no delay. Monte Carlo dispersion is along range only, no crosswind.
+- Endpoints are public, with no authentication — this is a learning project, not production.
 
-## Як це писалось
+## How this was built
 
-Архітектуру, фізику й тестові сценарії продумував сам, а писав у парі з Claude Code — AI бере на себе рутину (boilerplate, ендпоінти, тести), я перевіряю логіку і приймаю рішення. Для позиції AI Engineer це, думаю, і є частина навички — вміти працювати з AI-інструментами як з парним програмістом, а не просто знати теорію про LLM.
+I worked out the architecture, physics, and test scenarios myself, and wrote it paired with Claude Code — the AI handles the routine work (boilerplate, endpoints, tests) while I check the logic and make the decisions. For an AI Engineer role, I think that's part of the actual skill: working with AI tools as a pair programmer, not just knowing the theory behind LLMs.
