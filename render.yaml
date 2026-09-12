@@ -1,0 +1,31 @@
+# Render Blueprint — deploy Rocket Trajectory API for free.
+#
+# Auto-deploy on push needs Render's GitHub App to actually have access
+# to this repo (Configure it at https://github.com/settings/installations
+# -> Render -> "All repositories", or add this repo explicitly under
+# "Only select repositories") — otherwise every push needs a manual
+# "Deploy latest commit" in the Render dashboard.
+#
+# What this deploys:
+#   - a free Web Service running the existing Dockerfile (uvicorn)
+# What to know:
+#   - Render's free plan has no persistent disk. SQLite (rocket.db) and
+#     the ChromaDB index (chroma_data/) live on the container's local
+#     filesystem, so both reset on every deploy and whenever the free
+#     instance is rescheduled. Fine for a demo — simulations created
+#     during a session survive until the next deploy/restart, not
+#     forever. If real persistence is needed later: move Simulation rows
+#     to a free Postgres (Supabase/Neon) and re-derive the ChromaDB index
+#     from them on startup, same pattern as CoffeeTime's DB_* setup.
+
+services:
+  - type: web
+    name: rocket-projection
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false # set in the Render dashboard after first deploy
