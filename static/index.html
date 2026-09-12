@@ -113,6 +113,9 @@
                     <input type="number" id="createPropellant" step="0.01" min="0.01" value="0.1">
                 </label>
             </div>
+            <div id="engineSensibleRow" class="create-sensible-row hidden">
+                <button type="button" id="engineSensibleBtn" onclick="fillSensibleEngineParams()" title="Підбирає помірні тягу/час горіння/паливо під поточну масу (~3g прискорення, короткий burn) — орієнтир, не гарантія: екстремальні v0/кут все одно можуть вийти за ліміт симуляції.">Розумні параметри двигуна</button>
+            </div>
 
             <div id="parachuteFields" class="create-fields hidden">
                 <label>

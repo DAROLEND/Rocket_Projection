@@ -733,6 +733,36 @@ function openEditMode() {
 function toggleEngineFields() {
   const on = document.getElementById('toggleEngine').checked;
   document.getElementById('engineFields').classList.toggle('hidden', !on);
+  document.getElementById('engineSensibleRow').classList.toggle('hidden', !on);
+}
+
+function fillSensibleEngineParams() {
+  const mass = parseFloat(document.getElementById('createMass').value);
+  const errorEl = document.getElementById('createError');
+  errorEl.textContent = '';
+  if (!mass || mass <= 0) return;
+
+  // Heuristic, not a guarantee: aims for a burn that finishes fast (2s) at a
+  // moderate ~3g average acceleration, since that combo is what tends to keep
+  // a flight comfortably inside the 120s simulation window. It's blind to v0
+  // and angle though — an already-extreme launch speed can still push a
+  // simulation past that limit even with these values (the backend will say
+  // so clearly if it happens, rather than silently mislabeling the result).
+  const burnTime = 2;
+  const propellantMass = Math.min(mass * 0.2, mass - 0.01);
+  if (propellantMass <= 0) {
+    errorEl.textContent = 'Маса ракети занадто мала, щоб підібрати паливо (потрібно хоча б трохи запасу над 0.01 кг).';
+    return;
+  }
+  const avgMass = mass - propellantMass / 2;
+  const thrust = Math.round(avgMass * 3 * 9.81 * 10) / 10; // ~3g average accel during burn
+
+  document.getElementById('createThrust').value = thrust;
+  document.getElementById('createBurnTime').value = burnTime;
+  document.getElementById('createPropellant').value = propellantMass.toFixed(3);
+
+  document.getElementById('createNote').textContent =
+    `Підібрано: тяга ${thrust}Н, ${burnTime}с горіння, ${propellantMass.toFixed(3)}кг палива (~3g прискорення).`;
 }
 
 function toggleParachuteFields() {

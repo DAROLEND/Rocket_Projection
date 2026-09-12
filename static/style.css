@@ -677,6 +677,21 @@ input[type="range"]::-moz-range-thumb {
   padding: 0 14px;
 }
 
+.create-sensible-row {
+  margin: -4px 0 12px;
+}
+
+.create-sensible-row button {
+  height: 30px;
+  font-size: 11px;
+  padding: 0 12px;
+  background: #334155;
+}
+
+.create-sensible-row button:hover {
+  background: #475569;
+}
+
 .compare-panel {
   background: #1e293b;
   border: 1px solid #334155;
